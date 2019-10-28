@@ -52,8 +52,7 @@ func NewController(clientset *kubernetes.Clientset, queue workqueue.RateLimiting
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			// IndexerInformer uses a delta queue, therefore for deletes we have to use this
-			// key function.
+
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			var event Event
 			if err == nil {
@@ -63,6 +62,7 @@ func NewController(clientset *kubernetes.Clientset, queue workqueue.RateLimiting
 				event.deploymentImage = obj.(*appsv1.Deployment).Spec.Template.Spec.Containers[0].Image
 				queue.Add(key)
 			}
+
 		},
 	}, cache.Indexers{})
 
@@ -78,7 +78,6 @@ func NewController(clientset *kubernetes.Clientset, queue workqueue.RateLimiting
 func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 	defer runtime.HandleCrash()
 
-	// Let the workers stop when we are done
 	defer c.queue.ShutDown()
 	klog.Info("Starting Deployment controller")
 

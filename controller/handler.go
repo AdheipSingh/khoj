@@ -10,19 +10,15 @@ import (
 
 func (c *Controller) syncHandler(key string) error {
 	obj, exists, err := c.indexer.GetByKey(key)
-	deploymentName := obj.(*appsv1.Deployment).Name
-	deploymentImage := obj.(*appsv1.Deployment).Spec.Template.Spec.Containers[0].Image
-
 	if err != nil {
 		klog.Errorf("Error fetching obj %s from store failed due to %v\n", key, err)
 		return err
 	}
-
 	if !exists {
-		fmt.Printf("Deployment %s does not exist anymore\n", key)
+		fmt.Printf("Deployment [%s]  does not exist \n", key)
 	} else {
 
-		fmt.Printf("Deployment Name [%s] : Image Name [%s] \n", deploymentName, deploymentImage)
+		fmt.Printf("Deployment name [%s] ||  Image name [%s] \n", obj.(*appsv1.Deployment).Name, obj.(*appsv1.Deployment).Spec.Template.Spec.Containers[0].Image)
 	}
 	return nil
 
@@ -42,7 +38,6 @@ func (c *Controller) handleErr(err error, key interface{}) {
 	}
 
 	c.queue.Forget(key)
-
 	runtime.HandleError(err)
 	klog.Infof("Dropping Deployemnt %q out of the queue: %v", key, err)
 }
