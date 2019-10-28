@@ -26,20 +26,28 @@ type Controller struct {
 // NewController init
 func NewController(clientset *kubernetes.Clientset, queue workqueue.RateLimitingInterface, listWatcher *cache.ListWatch) *Controller {
 
-	// Bind the workqueue to a cache with the help of an informer. This way we make sure that
-	// whenever the cache is updated, the pod key is added to the workqueue.
-	// Note that when we finally process the item from the workqueue, we might see a newer version
-	// of the Pod than the version which was responsible for triggering the update.
 	indexer, informer := cache.NewIndexerInformer(listWatcher, &appsv1.Deployment{}, 0, cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
+			var event Event
+
 			if err == nil {
+				event.key = key
+				event.eventType = "create"
+				event.deploymentName = obj.(*appsv1.Deployment).Name
+				event.deploymentImage = obj.(*appsv1.Deployment).Spec.Template.Spec.Containers[0].Image
 				queue.Add(key)
 			}
 		},
-		UpdateFunc: func(old interface{}, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
+		UpdateFunc: func(oldObj interface{}, newObj interface{}) {
+			key, err := cache.MetaNamespaceKeyFunc(newObj)
+			var event Event
+
 			if err == nil {
+				event.key = key
+				event.eventType = "update"
+				event.deploymentName = oldObj.(*appsv1.Deployment).Name
+				event.deploymentImage = oldObj.(*appsv1.Deployment).Spec.Template.Spec.Containers[0].Image
 				queue.Add(key)
 			}
 		},
@@ -47,7 +55,12 @@ func NewController(clientset *kubernetes.Clientset, queue workqueue.RateLimiting
 			// IndexerInformer uses a delta queue, therefore for deletes we have to use this
 			// key function.
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+			var event Event
 			if err == nil {
+				event.key = key
+				event.eventType = "delete"
+				event.deploymentName = obj.(*appsv1.Deployment).Name
+				event.deploymentImage = obj.(*appsv1.Deployment).Spec.Template.Spec.Containers[0].Image
 				queue.Add(key)
 			}
 		},
@@ -71,7 +84,6 @@ func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 
 	go c.informer.Run(stopCh)
 
-	// Wait for all involved caches to be synced, before processing items from the queue is started
 	if !cache.WaitForCacheSync(stopCh, c.informer.HasSynced) {
 		runtime.HandleError(fmt.Errorf("Timed out waiting for caches to sync"))
 		return
